@@ -34,12 +34,12 @@ struct disjunction<B1, Bn...>
 // SOFTWARE.
 
 
+// https://en.cppreference.com/w/cpp/utility/tuple/tuple_element
 template <class... Args>
 struct type_list
 {
     using size = std::integral_constant<std::size_t, sizeof...(Args)>;
-  
-    // https://en.cppreference.com/w/cpp/utility/tuple/tuple_element
+
     template <std::size_t N>
     using get = typename std::tuple_element<N, std::tuple<Args...>>::type;
 
@@ -53,6 +53,9 @@ struct type_list
     using has = disjunction<std::is_same<T, Args>...>;
 
     using tuple = apply<std::tuple>;
+
+    using begin = get<0>;
+    using back  = get<size::value-1>;
 
     template <
         class Needle, 
@@ -68,7 +71,55 @@ struct type_list
     > {};
 
     template <class... Args2>
-    using zip = type_list<type_list<Args, Args2>...>;     
+    using zip_args = type_list<type_list<Args, Args2>...>;
+
+    template <class other_type_list>
+    using zip = typename other_type_list::template apply<zip_args>;
+
+    template <class... Args2>
+    using prepend_args = type_list<Args2..., Args...>;
+
+    template <class other_type_list>
+    using prepend = typename other_type_list::template apply<prepend_args>;
+
+    template <class... Args2>
+    using concat_args = type_list<Args..., Args2...>;
+
+    template <class other_type_list>
+    using concat = typename other_type_list::template apply<concat_args>;
+
+    template <template <class, class> class F, class Lhs>
+    using foldl = multi_object_tracker::foldl<F,Lhs,Args...>;
 };
 template <class type_list>
 using tuple_of = typename type_list::tuple;
+
+
+
+// https://gist.github.com/ntessore/dc17769676fb3c6daa1f
+template<typename T, T... Ints>
+struct integer_sequence
+{
+    typedef T value_type;
+    static constexpr std::size_t size() { return sizeof...(Ints); }
+
+    using as_type_list = type_list<std::integral_constant<T, Ints>...>;
+};
+
+template<std::size_t... Ints>
+using index_sequence = integer_sequence<std::size_t, Ints...>;
+
+template<typename T, std::size_t N, T... Is>
+struct make_integer_sequence : make_integer_sequence<T, N-1, N-1, Is...> {};
+
+template<typename T, T... Is>
+struct make_integer_sequence<T, 0, Is...> : integer_sequence<T, Is...> {};
+
+template<std::size_t N>
+using make_index_sequence = make_integer_sequence<std::size_t, N>;
+
+template<typename... T>
+using index_sequence_for = make_index_sequence<sizeof...(T)>;
+
+template<typename T>
+using index_sequence_for_type_list = make_index_sequence<T::size::value>;
