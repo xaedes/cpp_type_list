@@ -3,13 +3,40 @@
 #include <tuple>
 #include <type_traits>
 
-// https://en.cppreference.com/w/cpp/types/disjunction
-template<class...> struct disjunction : std::false_type { };
-template<class B1> struct disjunction<B1> : B1 { };
+namespace tl {
+
+// https://en.cppreference.com/w/cpp/types/conjunction 
+// AND
+template<class...> struct conjunction : std::true_type { };
+template<class B1> struct conjunction<B1> : B1 { };
 template<class B1, class... Bn>
+struct conjunction<B1, Bn...> 
+    : std::conditional_t<bool(B1::value), conjunction<Bn...>, B1> {};
+
+// https://en.cppreference.com/w/cpp/types/disjunction
+// OR
+template <class...> struct disjunction : std::false_type { };
+template <class B1> struct disjunction<B1> : B1 { };
+template <class B1, class... Bn>
 struct disjunction<B1, Bn...> 
     : std::conditional_t<bool(B1::value), B1, disjunction<Bn...>>  { };
 
+// foldl
+template <template <class, class> class F, class Lhs, class...>                    struct foldl : Lhs {};
+template <template <class, class> class F, class Lhs, class Rhs>                   struct foldl<F, Lhs, Rhs> : F<Lhs, Rhs> {};
+template <template <class, class> class F, class Lhs, class Rhs, class... RhsRest> struct foldl<F, Lhs, Rhs, RhsRest...> : foldl<F, F<Lhs, Rhs>, RhsRest...> {};
+
+// foldl_with_args
+template <template <class, class, class...> class F, class TL, class Lhs, class...>                    struct foldl_with_args : Lhs {};
+template <template <class, class, class...> class F, class TL, class Lhs, class Rhs>                   struct foldl_with_args<F, TL, Lhs, Rhs> : TL::template apply<F<Lhs, Rhs>> {};
+template <template <class, class, class...> class F, class TL, class Lhs, class Rhs, class... RhsRest> struct foldl_with_args<F, TL, Lhs, Rhs, RhsRest...> : foldl_with_args<F, TL, typename TL::template apply<F<Lhs, Rhs>>, RhsRest...> {};
+
+template <class Replacement>
+struct replace_by
+{
+    template <class T>
+    using type = Replacement;
+};
 
 // MIT License
 // 
@@ -89,12 +116,16 @@ struct type_list
     using concat = typename other_type_list::template apply<concat_args>;
 
     template <template <class, class> class F, class Lhs>
-    using foldl = multi_object_tracker::foldl<F,Lhs,Args...>;
+    using foldl = ::tl::foldl<F,Lhs,Args...>;
+
+    template <template <class, class, class...> class F, class TL, class Lhs>
+    using foldl_with_args = ::tl::foldl_with_args<F,TL,Lhs,Args...>;
 };
 template <class type_list>
 using tuple_of = typename type_list::tuple;
 
-
+// template <class T, std::size_t N>
+// using type_list_from_repeat = std::conditional_t<(N <= 0), type_list<>, type_list<prepend>
 
 // https://gist.github.com/ntessore/dc17769676fb3c6daa1f
 template<typename T, T... Ints>
@@ -123,3 +154,5 @@ using index_sequence_for = make_index_sequence<sizeof...(T)>;
 
 template<typename T>
 using index_sequence_for_type_list = make_index_sequence<T::size::value>;
+
+} // namespace tl
